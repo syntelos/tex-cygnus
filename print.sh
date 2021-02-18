@@ -94,7 +94,7 @@ EOF
 		fi
 	    fi
 
-	    if ${gen_png} && dvipng -T bbox -o ${tgt_png} ${tgt_dvi}
+	    if ${gen_png} && dvipng -p '=1' -T bbox -o ${tgt_png} ${tgt_dvi}
 	    then
 		git add ${tgt_png}
 	    fi
