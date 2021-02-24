@@ -1,4 +1,6 @@
 #!/bin/bash
+
+#set -x
 #
 #
 wd=$(dirname $0)
