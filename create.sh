@@ -56,7 +56,7 @@ then
 EOF
     else
         cat<<EOF>${file}
-\input shorts
+\input athena
 
 
 
