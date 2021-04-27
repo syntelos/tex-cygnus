@@ -1,65 +1,47 @@
 #!/bin/bash
 #
+#
+declare -g circa=$(basename $0 .sh)
+declare -g flist=${circa}.txt
+declare -g summation=${circa}.pdf
+declare -g head=$(which head)
+declare -g tail=$(which tail)
+#
 function usage {
     cat<<EOF>&2
 
-Synopsis
 
-  $0 process
+      Echo file set in basename.
 
-Description
+  <fxt>
 
-  Perform file set generation.
+      Echo file set in filename extension <fxt>.
 
-Synopsis
+  process
 
-  $0 add
+      Perform file set generation.
 
-Description
+  add
 
-  Perform file set update.
+      Perform file set update.
 
-Synopsis
+  tail
 
-  $0 tail
+      Echo last basename
 
-Description
+  -?
 
-  Echo last basename
-
-Synopsis
-
-  $0
-
-Description
-
-  Echo file set in basename.
-
-Synopsis
-
-  $0 <fxt>
-
-Description
-
-  Echo file set in filename extension <fxt>.
-
-Synopsis
-
-  $0 -?
-
-Description
-
-  This message.
+      This message.
 
 EOF
 }
 #
 function current {
-  cat cygnus-202104-1.txt | sed 's%/%%g; s%^%cygnus-%; s%$%-0%;'
+  cat ${flist} | sed 's%/%%g; s%^%cygnus-%; s%$%-0%;'
 }
 #
 function tail {
-  tail -n 1 cygnus-202104-1.txt | sed 's%/%%g; s%^%cygnus-%; s%$%-0%;'
+  ${tail} -n 1 ${flist} | sed 's%/%%g; s%^%cygnus-%; s%$%-0%;'
 }
 #
 function fext {
@@ -78,66 +60,170 @@ function tail_fext {
   done
 }
 #
+function process_tex {
+    for src in $(fext tex); do tex ${src}; done
+}
+#
+function process_dvips {
+    for src in $(fext dvi); do dvips ${src}; done
+}
+#
+function process_dvipdf {
+    for src in $(fext dvi); do dvipdf ${src}; done
+}
+#
+function process_summation {
+    pdfunite $(fext pdf) ${summation}
+}
+#
 function process {
-    for src in $(fext tex)
-    do
-        tex $src
-    done
 
-    for src in $(fext dvi)
-    do
-        dvips $src
-    done
+    if process_tex
+    then
 
-    for src in $(fext dvi)
-    do
-        dvipdf $src
-    done
+        if process_dvips
+        then
 
-    pdfunite $(fext pdf) cygnus-202104-1.pdf
+            if process_dvipdf
+            then
+
+                if process_summation
+                then
+                    git status --porcelain $(fext tex) $(fext dvi) $(fext ps) $(fext pdf) ${summation}
+                    return 0
+                else
+                    cat<<EOF>&2
+$0 [process] error in 'process_summation'.
+EOF
+                    return 1
+                fi
+            else
+                cat<<EOF>&2
+$0 [process] error in 'process_dvipdf'.
+EOF
+                return 1
+            fi
+        else
+            cat<<EOF>&2
+$0 [process] error in 'process_dvips'.
+EOF
+            return 1
+        fi
+    else
+        cat<<EOF>&2
+$0 [process] error in 'process_tex'.
+EOF
+        return 1
+    fi
+}
+#
+function tail_tex {
+    for src in $(tail_fext tex); do tex ${src}; done
+}
+#
+function tail_dvips {
+    for src in $(tail_fext dvi); do dvips ${src}; done
+}
+#
+function tail_dvipdf {
+    for src in $(tail_fext dvi); do dvipdf ${src}; done
 }
 #
 function add {
-    for src in $(tail_fext tex)
-    do
-        tex $src
-    done
 
-    for src in $(tail_fext dvi)
-    do
-        dvips $src
-    done
+    # (update process)
+    if cp ${flist} /tmp/tmp && date +%Y/%m/%d >> /tmp/tmp
+    then
+        cat -n /tmp/tmp | sed 's%^%A %;'
+        if read -p 'Update? [Ny] ' update &&[ -n "${update}" ]&&[ "${update}" = 'y' -o "${update}" = 'Y' ]
+        then
+            cp /tmp/tmp ${flist}
+        fi
+    fi
+    # (tail process)
 
-    for src in $(tail_fext dvi)
-    do
-        dvipdf $src
-    done
+    if tail_tex
+    then
 
-    pdfunite $(fext pdf) cygnus-202104-1.pdf
+        if tail_dvips
+        then
+
+            if tail_dvipdf
+            then
+
+                if process_summation
+                then
+                    git status --porcelain $(tail_fext tex) $(tail_fext dvi) $(tail_fext ps) $(tail_fext pdf) ${summation}
+                    return 0
+                else
+                    cat<<EOF>&2
+$0 [add] error in 'process_summation'.
+EOF
+                    return 1
+                fi
+            else
+                cat<<EOF>&2
+$0 [add] error in 'tail_dvipdf'.
+EOF
+                return 1
+            fi
+        else
+            cat<<EOF>&2
+$0 [add] error in 'tail_dvips'.
+EOF
+            return 1
+        fi
+    else
+        cat<<EOF>&2
+$0 [add] error in 'tail_tex'.
+EOF
+        return 1
+    fi
 }
+#
 #
 if [ -n "${1}" ]
 then
 
-    if [ -n "$(echo ${1} | egrep '^process$')" ] && process
-    then
-        exit 0
+    case "${1}" in
+        process)
+            if process
+            then
+                exit 0
+            else
+                exit 1
+            fi
+            ;;
+        add)
+            if add
+            then
+                exit 0
+            else
+                exit 1
+            fi
+            ;;
+        tail)
+            if tail
+            then
+                exit 0
+            else
+                exit 1
+            fi
+            ;;
+        [a-z][a-z][a-z])
+            if fext ${1}
+            then
+                exit 0
+            else
+                exit 1
+            fi
+            ;;
+        *)
+            usage
+            exit 1
+            ;;
+    esac
 
-    elif [ -n "$(echo ${1} | egrep '^add$')" ] && process
-    then
-        exit 0
-
-    elif [ -n "$(echo ${1} | egrep '^tail$')" ] && tail
-    then
-        exit 0
-
-    elif [ -n "$(echo ${1} | egrep '^[a-z][a-z][a-z]$')" ] && fext ${1}
-    then
-        exit 0
-    else
-        usage
-        exit 1
-    fi
 else
     if current
     then
